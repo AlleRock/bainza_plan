@@ -7,6 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1C1E22">
+<!-- Istruzione per l'icona sui dispositivi Apple (iPhone / iPad) -->
+<link rel="apple-touch-icon" href="icona.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -230,6 +232,7 @@ input[type=file]{display:none;}
   <div class="sheet">
     <button class="close-x" onclick="closeSheet()">✕</button>
     
+    <!-- Nuova sezione Sincronizzazione Cloudflare -->
     <h3>Sincronizzazione Cloud</h3>
     <p class="hint">Inserisci una chiave segreta univoca per sincronizzare i tuoi dati tra più dispositivi (es. telefono e PC).</p>
     <div style="display:flex; gap:10px; margin-bottom:16px;">
@@ -643,7 +646,7 @@ async function boot(){
   
   setView('week');
   
-  // Controllo in background dal cloud se c'è una chiave segreta salvata
+  // Controllo in background dal cloud si c'è una chiave segreta salvata
   const savedKey = localStorage.getItem(SYNC_KEY_STORE);
   if(savedKey) {
     try {
