@@ -9,6 +9,10 @@
 <meta name="theme-color" content="#1C1E22">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- 1. COLLEGAMENTO AL MANIFEST (AGGIUNTO QUI) -->
+<link rel="manifest" href="manifest.json">
+
 <style>
 :root{
   --asphalt:#1C1E22;
@@ -254,6 +258,15 @@ LUN 29/06 | 25-30 km | facile
 </div>
 
 <script>
+// 2. REGISTRAZIONE DEL SERVICE WORKER (AGGIUNTO ALL'INIZIO DELLO SCRIPT)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker registrato con successo!', reg))
+      .catch(err => console.error('Errore nella registrazione del Service Worker:', err));
+  });
+}
+
 const STORE_KEY = 'bainzaplan_v1';
 let plan = null;
 let view = 'week';
