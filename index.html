@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BainzaPlan</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1C1E22">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --asphalt:#1C1E22;
+  --asphalt-2:#26292F;
+  --chalk:#F3EFE6;
+  --chalk-dim:#A9A6A0;
+  --giallo:#F4C20D;
+  --carico:#C8553D;
+  --scarico:#D9A441;
+  --taper:#4F8B6E;
+  --picco:#E23D28;
+  --line:#3A3D44;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--asphalt);
+  color:var(--chalk);
+  font-family:'Inter',system-ui,sans-serif;
+  min-height:100vh;
+  padding-bottom:90px;
+}
+h1,h2,h3,.num{font-family:'Oswald',sans-serif;}
+
+/* ---- Header ---- */
+header.top{
+  position:sticky; top:0; z-index:20;
+  background:linear-gradient(180deg,var(--asphalt) 80%, transparent);
+  padding:18px 18px 10px;
+  display:flex; align-items:baseline; justify-content:space-between;
+}
+header.top .brand{
+  font-family:'Oswald',sans-serif; font-weight:700; font-size:22px;
+  letter-spacing:0.5px;
+}
+header.top .brand span{color:var(--giallo);}
+header.top .gear{
+  background:none;border:none;color:var(--chalk-dim);font-size:20px;cursor:pointer;
+  padding:6px;
+}
+
+/* ---- Road divider ---- */
+.road{
+  height:6px; margin:0 18px 18px; border-radius:3px; position:relative; overflow:hidden;
+  background:repeating-linear-gradient(90deg, var(--giallo) 0 18px, transparent 18px 34px);
+  opacity:0.55;
+}
+
+/* ---- Empty state ---- */
+.empty{
+  margin:60px 24px; text-align:center; color:var(--chalk-dim);
+}
+.empty h2{color:var(--chalk); font-size:24px; margin-bottom:8px;}
+.empty p{line-height:1.5; font-size:15px;}
+.btn{
+  display:inline-block; margin-top:18px; background:var(--giallo); color:var(--asphalt);
+  font-weight:700; font-family:'Oswald',sans-serif; letter-spacing:0.5px;
+  padding:13px 26px; border-radius:8px; border:none; font-size:15px; cursor:pointer;
+}
+.btn.secondary{background:none; border:1.5px solid var(--line); color:var(--chalk);}
+
+/* ---- This week hero ---- */
+.week-nav{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:0 14px; margin-bottom:10px;
+}
+.week-nav .section-label{padding:0;}
+.wn-arrow{
+  background:var(--asphalt-2); border:1px solid var(--line); color:var(--chalk);
+  width:34px; height:34px; border-radius:50%; font-size:18px; line-height:1; cursor:pointer;
+  flex-shrink:0; display:flex; align-items:center; justify-content:center;
+}
+.wn-arrow:disabled{opacity:0.25; cursor:default;}
+.section-label{
+  text-transform:uppercase; font-size:12px; letter-spacing:2px; color:var(--chalk-dim);
+  padding:0 18px; margin-bottom:10px; font-weight:600;
+}
+.hero{
+  margin:0 18px 28px; border-radius:16px; padding:20px;
+  background:var(--asphalt-2); border:1px solid var(--line); position:relative; overflow:hidden;
+}
+.hero.tag-PICCO{border-color:var(--picco); box-shadow:0 0 0 1px var(--picco) inset;}
+.hero.tag-CARICO{border-color:var(--carico);}
+.hero.tag-SCARICO{border-color:var(--scarico);}
+.hero.tag-TAPER{border-color:var(--taper);}
+.hero .week-title{font-size:13px; color:var(--chalk-dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;}
+.hero .week-range{font-family:'Oswald',sans-serif; font-size:19px; font-weight:600; margin-bottom:14px;}
+.daycard{
+  display:flex; align-items:center; gap:14px; padding:13px 0; border-top:1px solid var(--line);
+}
+.daycard:first-of-type{border-top:none;}
+.daycard .dow{
+  font-family:'Oswald',sans-serif; font-weight:700; font-size:13px; width:38px; flex-shrink:0;
+  color:var(--chalk-dim);
+}
+.daycard.today .dow{color:var(--giallo);}
+.daycard .info{flex:1;}
+.daycard .km{font-family:'Oswald',sans-serif; font-size:17px; font-weight:600;}
+.daycard .meta{font-size:12.5px; color:var(--chalk-dim); margin-top:1px;}
+.pill{
+  font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px; letter-spacing:0.5px;
+  text-transform:uppercase; flex-shrink:0;
+}
+.pill.facile{background:#2E3B33; color:#8FCBA8;}
+.pill.medio{background:#3A3320; color:var(--scarico);}
+.pill.PICCO{background:#3D211C; color:var(--picco);}
+.pill.CARICO{background:#3D2A22; color:var(--carico);}
+.pill.SCARICO{background:#3A3320; color:var(--scarico);}
+.pill.TAPER{background:#243A30; color:var(--taper);}
+.pill.riposo{background:#2A2C31; color:var(--chalk-dim);}
+
+.note-strip{
+  margin-top:14px; padding-top:12px; border-top:1px solid var(--line);
+  font-size:13px; color:var(--chalk-dim); font-style:italic;
+}
+
+/* countdown ribbon */
+.countdown{
+  display:flex; gap:10px; margin:0 18px 24px; overflow-x:auto; padding-bottom:4px;
+  scrollbar-width:none;
+}
+.countdown::-webkit-scrollbar{display:none;}
+.cd-chip{
+  flex-shrink:0; background:var(--asphalt-2); border:1px solid var(--line); border-radius:12px;
+  padding:10px 14px; min-width:84px; text-align:center;
+}
+.cd-chip .n{font-family:'Oswald',sans-serif; font-size:22px; font-weight:700; color:var(--giallo);}
+.cd-chip .l{font-size:10px; color:var(--chalk-dim); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px;}
+
+/* ---- Timeline ---- */
+.blocco-head{
+  padding:28px 18px 6px; font-family:'Oswald',sans-serif; font-size:14px; font-weight:600;
+  color:var(--giallo); text-transform:uppercase; letter-spacing:1px;
+}
+.timeline{padding:0 18px;}
+.week-row{
+  display:flex; gap:0; margin-bottom:10px; border-radius:12px; overflow:hidden;
+  border:1px solid var(--line); background:var(--asphalt-2);
+}
+.week-row .bar{width:5px; flex-shrink:0;}
+.bar.CARICO{background:var(--carico);}
+.bar.SCARICO{background:var(--scarico);}
+.bar.TAPER{background:var(--taper);}
+.bar.PICCO{background:var(--picco);}
+.bar.NORMALE{background:var(--line);}
+.week-row .content{flex:1; padding:12px 14px;}
+.week-row .wtitle{font-size:11px; color:var(--chalk-dim); text-transform:uppercase; letter-spacing:0.8px;}
+.week-row .wrange{font-family:'Oswald',sans-serif; font-weight:600; font-size:15px; margin:2px 0 6px;}
+.week-row .wdays{display:flex; gap:6px; flex-wrap:wrap;}
+.wd{
+  font-size:11px; background:var(--asphalt); border:1px solid var(--line); border-radius:7px;
+  padding:4px 7px; color:var(--chalk-dim);
+}
+.wd b{color:var(--chalk); font-weight:600;}
+.wd.PICCO{border-color:var(--picco); color:var(--picco);}
+
+/* ---- Bottom nav ---- */
+nav.bottom{
+  position:fixed; bottom:0; left:0; right:0; z-index:30;
+  background:rgba(28,30,34,0.92); backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);
+  display:flex; padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+}
+nav.bottom button{
+  flex:1; background:none; border:none; color:var(--chalk-dim); font-family:'Inter';
+  font-size:11.5px; padding:8px 0; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:4px;
+}
+nav.bottom button.active{color:var(--giallo);}
+nav.bottom .ic{font-size:19px;}
+
+/* ---- Modal ---- */
+.overlay{
+  position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:50; display:none;
+  align-items:flex-end; justify-content:center;
+}
+.overlay.show{display:flex;}
+.sheet{
+  background:var(--asphalt-2); width:100%; max-width:560px; border-radius:18px 18px 0 0;
+  padding:22px; max-height:88vh; overflow-y:auto; border-top:1px solid var(--line);
+}
+.sheet h3{margin:0 0 4px;}
+.sheet p.hint{color:var(--chalk-dim); font-size:13px; margin:0 0 14px; line-height:1.5;}
+.sheet textarea{
+  width:100%; min-height:220px; background:var(--asphalt); color:var(--chalk);
+  border:1px solid var(--line); border-radius:10px; padding:12px; font-family:monospace;
+  font-size:12.5px; line-height:1.5; resize:vertical;
+}
+.sheet .actions{display:flex; gap:10px; margin-top:14px;}
+.sheet .actions .btn{flex:1; text-align:center;}
+input[type=file]{display:none;}
+.close-x{
+  position:absolute; top:16px; right:18px; background:none; border:none; color:var(--chalk-dim);
+  font-size:22px; cursor:pointer;
+}
+.sheet{position:relative;}
+.err{color:var(--picco); font-size:12.5px; margin-top:8px; display:none;}
+.example{
+  background:var(--asphalt); border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+  font-family:monospace; font-size:11px; color:var(--chalk-dim); margin-top:10px; line-height:1.6; white-space:pre-wrap;
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">Bainza<span>Plan</span></div>
+  <button class="gear" onclick="openSheet()">⚙</button>
+</header>
+<div class="road"></div>
+
+<div id="app"></div>
+
+<nav class="bottom">
+  <button id="nav-week" class="active" onclick="setView('week')"><span class="ic">📍</span>Questa settimana</button>
+  <button id="nav-timeline" onclick="setView('timeline')"><span class="ic">🗓️</span>Timeline</button>
+</nav>
+
+<div class="overlay" id="overlay">
+  <div class="sheet">
+    <button class="close-x" onclick="closeSheet()">✕</button>
+    <h3>Carica piano</h3>
+    <p class="hint">Incolla qui il testo esportato dal tuo template Word, oppure carica il file .txt. Salvato solo su questo dispositivo, nessun server coinvolto.</p>
+    <textarea id="planInput" placeholder="Incolla qui il piano..."></textarea>
+    <div class="err" id="parseErr"></div>
+    <div class="actions">
+      <label class="btn secondary" style="text-align:center;">
+        Carica file
+        <input type="file" id="fileInput" accept=".txt,.md">
+      </label>
+      <button class="btn" onclick="loadFromTextarea()">Salva piano</button>
+    </div>
+    <div class="example">BLOCCO: Verso 11 Luglio | 2026
+SETTIMANA: 22/06 - 28/06 | CARICO
+LUN 22/06 | 25-30 km | facile
+MER 24/06 | 30-35 km | 400-600 D+ | medio
+SAB 27/06 | 100-110 km | 1800-1900 D+ | PICCO
+NOTE: Settimana chiave di costruzione vera
+
+SETTIMANA: 29/06 - 05/07 | SCARICO
+LUN 29/06 | 25-30 km | facile
+...</div>
+  </div>
+</div>
+
+<script>
+const STORE_KEY = 'bainzaplan_v1';
+let plan = null;
+let view = 'week';
+
+/* ---------- Parser ---------- */
+function parsePlan(text){
+  const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length);
+  const blocchi = [];
+  let curBlocco = null, curWeek = null;
+  const dowMap = {LUN:'Lun',MAR:'Mar',MER:'Mer',GIO:'Gio',VEN:'Ven',SAB:'Sab',DOM:'Dom'};
+  const tagWords = ['PICCO','CARICO','SCARICO','TAPER'];
+
+  for(const line of lines){
+    if(/^BLOCCO\s*:/i.test(line)){
+      const rest = line.split(':').slice(1).join(':').trim();
+      const parts = rest.split('|').map(p=>p.trim());
+      const title = parts[0];
+      const yearPart = parts[1] && /^\d{4}$/.test(parts[1]) ? parseInt(parts[1],10) : null;
+      curBlocco = { title, year: yearPart || currentYear(), weeks: [] };
+      blocchi.push(curBlocco);
+      curWeek = null;
+      continue;
+    }
+    if(/^SETTIMANA\s*:/i.test(line)){
+      if(!curBlocco){ curBlocco = {title:'Piano', year: currentYear(), weeks:[]}; blocchi.push(curBlocco); }
+      const rest = line.split(':').slice(1).join(':').trim();
+      const parts = rest.split('|').map(p=>p.trim());
+      const range = parts[0];
+      const label = parts[1] || '';
+      const [d1,d2] = range.split('-').map(s=>s.trim());
+      curWeek = {
+        range, label, start:d1, end:d2, year: curBlocco.year,
+        days:[], note:'', weekTag: detectWeekTag(label)
+      };
+      curBlocco.weeks.push(curWeek);
+      continue;
+    }
+    if(/^NOTE\s*:/i.test(line)){
+      if(curWeek) curWeek.note = line.split(':').slice(1).join(':').trim();
+      continue;
+    }
+    const dowMatch = line.match(/^([A-Z]{3})\s+(\d{1,2}\/\d{1,2})\s*\|(.*)$/i);
+    if(dowMatch && curWeek){
+      const dow = dowMatch[1].toUpperCase();
+      const date = dowMatch[2];
+      const fields = dowMatch[3].split('|').map(f=>f.trim()).filter(f=>f.length);
+      let km='', dplus='', tag='';
+      for(const f of fields){
+        if(/km/i.test(f)) km = f;
+        else if(/D\+/i.test(f)) dplus = f;
+        else if(tagWords.includes(f.toUpperCase())) tag = f.toUpperCase();
+        else if(!tag) tag = f; // facile/medio/etc free text
+      }
+      curWeek.days.push({ dow: dowMap[dow]||dow, date, km, dplus, tag, raw: fields.join(' · ') });
+      continue;
+    }
+  }
+  // assign week-level tag from day tags if not set
+  blocchi.forEach(b=>b.weeks.forEach(w=>{
+    if(!w.weekTag){
+      const tags = w.days.map(d=>d.tag.toUpperCase());
+      if(tags.includes('PICCO')) w.weekTag='PICCO';
+      else if(tags.some(t=>t.includes('SCARIC'))) w.weekTag='SCARICO';
+      else if(tags.some(t=>t.includes('CARIC'))) w.weekTag='CARICO';
+      else if(tags.some(t=>t.includes('TAPER'))) w.weekTag='TAPER';
+      else w.weekTag='NORMALE';
+    }
+  }));
+  if(blocchi.length===0 || blocchi.every(b=>b.weeks.length===0)){
+    throw new Error('Nessuna settimana riconosciuta. Controlla il formato (vedi esempio sotto).');
+  }
+  return { blocchi, savedAt: Date.now() };
+}
+
+function detectWeekTag(label){
+  const u = (label||'').toUpperCase();
+  if(u.includes('PICCO')) return 'PICCO';
+  if(u.includes('SCARIC')) return 'SCARICO';
+  if(u.includes('CARIC')) return 'CARICO';
+  if(u.includes('TAPER')) return 'TAPER';
+  return null;
+}
+
+/* ---------- Date helpers ---------- */
+function parseItDate(str, refYear){
+  const [d,m] = str.split('/').map(Number);
+  return new Date(refYear, m-1, d);
+}
+function currentYear(){ return new Date().getFullYear(); }
+
+function weekDateRange(week){
+  const start = parseItDate(week.start, week.year);
+  const end = parseItDate(week.end, week.year);
+  return {start,end};
+}
+
+function flatWeeks(plan){
+  let all = [];
+  plan.blocchi.forEach(b=>b.weeks.forEach(w=>all.push(w)));
+  return all;
+}
+
+function findCurrentWeekIndex(plan){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const all = flatWeeks(plan);
+  for(let i=0;i<all.length;i++){
+    const {start,end} = weekDateRange(all[i]);
+    const endAdj = new Date(end); endAdj.setHours(23,59,59,999);
+    if(today>=start && today<=endAdj) return i;
+  }
+  let bestIdx=-1, best=Infinity;
+  all.forEach((w,i)=>{
+    const {start} = weekDateRange(w);
+    const diff = start-today;
+    if(diff>=0 && diff<best){best=diff; bestIdx=i;}
+  });
+  if(bestIdx>=0) return bestIdx;
+  return all.length ? all.length-1 : -1;
+}
+
+function fmtDayLabel(d){
+  const days=['DOM','LUN','MAR','MER','GIO','VEN','SAB'];
+  return days[d.getDay()];
+}
+
+/* ---------- Render: Week view ---------- */
+let weekIndex = 0;
+
+function renderWeek(){
+  const root = document.getElementById('app');
+  if(!plan){ root.innerHTML = emptyState(); return; }
+  const all = flatWeeks(plan);
+  if(!all.length){ root.innerHTML = emptyState(); return; }
+  if(weekIndex<0) weekIndex=0;
+  if(weekIndex>all.length-1) weekIndex=all.length-1;
+  const week = all[weekIndex];
+  const isCurrentReal = weekIndex===findCurrentWeekIndex(plan);
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const y = week.year;
+
+  let daysHtml = week.days.map(d=>{
+    const dDate = parseItDate(d.date, y);
+    const isToday = dDate.getTime()===today.getTime();
+    const tagClass = (d.tag||'').toLowerCase()==='facile' ? 'facile'
+      : (d.tag||'').toLowerCase()==='medio' ? 'medio'
+      : (d.tag||'').toUpperCase()==='PICCO' ? 'PICCO'
+      : (d.tag||'').toUpperCase()==='CARICO' ? 'CARICO'
+      : (d.tag||'').toUpperCase()==='SCARICO' ? 'SCARICO'
+      : (d.tag||'').toUpperCase()==='TAPER' ? 'TAPER'
+      : (d.km==='' ? 'riposo' : '');
+    return `<div class="daycard ${isToday?'today':''}">
+      <div class="dow">${d.dow}<br><span style="font-weight:400;opacity:.6;font-size:11px;">${d.date}</span></div>
+      <div class="info">
+        <div class="km">${d.km || 'Riposo'}</div>
+        <div class="meta">${d.dplus || ''}</div>
+      </div>
+      ${d.tag ? `<span class="pill ${tagClass}">${d.tag}</span>` : ''}
+    </div>`;
+  }).join('');
+
+  // countdown to key future PICCO/event days (sempre dal piano intero, non dalla settimana visualizzata)
+  const allDays = [];
+  plan.blocchi.forEach(b=>b.weeks.forEach(w=>w.days.forEach(d=>allDays.push({...d, year:w.year}))));
+  const upcoming = allDays
+    .map(d=>({...d, dt: parseItDate(d.date,d.year)}))
+    .filter(d=> d.dt>=today && (d.tag||'').toUpperCase()==='PICCO')
+    .sort((a,b)=>a.dt-b.dt)
+    .slice(0,5);
+  const cdHtml = upcoming.length ? `<div class="countdown">${upcoming.map(d=>{
+    const diff = Math.round((d.dt-today)/86400000);
+    return `<div class="cd-chip"><div class="n">${diff}</div><div class="l">gg a ${d.dow} ${d.date}</div></div>`;
+  }).join('')}</div>` : '';
+
+  root.innerHTML = `
+    <div class="week-nav">
+      <button class="wn-arrow" onclick="goWeek(-1)" ${weekIndex<=0?'disabled':''}>‹</button>
+      <div class="section-label" style="margin:0;">${isCurrentReal ? 'Settimana in corso' : (weekDateRange(week).start < today ? 'Settimana passata' : 'Settimana futura')}</div>
+      <button class="wn-arrow" onclick="goWeek(1)" ${weekIndex>=all.length-1?'disabled':''}>›</button>
+    </div>
+    <div class="hero tag-${week.weekTag}" id="weekHero">
+      <div class="week-title">${week.label || ''}</div>
+      <div class="week-range">${week.range}</div>
+      ${daysHtml}
+      ${week.note ? `<div class="note-strip">💡 ${week.note}</div>` : ''}
+    </div>
+    ${cdHtml}
+  `;
+  attachSwipe();
+}
+
+function goWeek(delta){
+  weekIndex += delta;
+  renderWeek();
+}
+
+function attachSwipe(){
+  const hero = document.getElementById('weekHero');
+  if(!hero) return;
+  let startX=0, startY=0, tracking=false;
+  hero.addEventListener('touchstart', e=>{
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY; tracking=true;
+  }, {passive:true});
+  hero.addEventListener('touchend', e=>{
+    if(!tracking) return; tracking=false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)*1.5){
+      if(dx<0) goWeek(1); else goWeek(-1);
+    }
+  }, {passive:true});
+}
+
+/* ---------- Render: Timeline ---------- */
+function renderTimeline(){
+  const root = document.getElementById('app');
+  if(!plan){ root.innerHTML = emptyState(); return; }
+  let html = '';
+  plan.blocchi.forEach(b=>{
+    html += `<div class="blocco-head">${b.title}</div><div class="timeline">`;
+    b.weeks.forEach(w=>{
+      const dchips = w.days.map(d=>{
+        const isPicco = (d.tag||'').toUpperCase()==='PICCO';
+        return `<span class="wd ${isPicco?'PICCO':''}"><b>${d.dow}</b> ${d.km||'riposo'}</span>`;
+      }).join('');
+      html += `<div class="week-row">
+        <div class="bar ${w.weekTag}"></div>
+        <div class="content">
+          <div class="wtitle">${w.label||''}</div>
+          <div class="wrange">${w.range}</div>
+          <div class="wdays">${dchips}</div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  root.innerHTML = html;
+}
+
+function emptyState(){
+  return `<div class="empty">
+    <h2>Nessun piano caricato</h2>
+    <p>Carica il piano esportato dal template Word per vedere la settimana corrente e la timeline completa della stagione.</p>
+    <button class="btn" onclick="openSheet()">Carica piano</button>
+  </div>`;
+}
+
+/* ---------- Nav / View ---------- */
+function setView(v){
+  view = v;
+  document.getElementById('nav-week').classList.toggle('active', v==='week');
+  document.getElementById('nav-timeline').classList.toggle('active', v==='timeline');
+  if(v==='week'){
+    if(plan) weekIndex = findCurrentWeekIndex(plan);
+    renderWeek();
+  } else renderTimeline();
+}
+
+/* ---------- Sheet / loading ---------- */
+function openSheet(){
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('parseErr').style.display='none';
+  if(plan) document.getElementById('planInput').value = plan.__raw || '';
+}
+function closeSheet(){ document.getElementById('overlay').classList.remove('show'); }
+
+function loadFromTextarea(){
+  const text = document.getElementById('planInput').value;
+  try{
+    const parsed = parsePlan(text);
+    parsed.__raw = text;
+    plan = parsed;
+    localStorage.setItem(STORE_KEY, JSON.stringify({raw:text, savedAt:Date.now()}));
+    closeSheet();
+    setView(view);
+  }catch(e){
+    const err = document.getElementById('parseErr');
+    err.textContent = '⚠️ ' + e.message;
+    err.style.display='block';
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    document.getElementById('planInput').value = reader.result;
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- Boot ---------- */
+function boot(){
+  let saved = localStorage.getItem(STORE_KEY);
+  if(!saved){
+    const legacy = localStorage.getItem('fassaplan_v1');
+    if(legacy){ localStorage.setItem(STORE_KEY, legacy); saved = legacy; }
+  }
+  if(saved){
+    try{
+      const {raw} = JSON.parse(saved);
+      const parsed = parsePlan(raw);
+      parsed.__raw = raw;
+      plan = parsed;
+    }catch(e){ plan = null; }
+  }
+  setView('week');
+}
+boot();
+</script>
+</body>
+</html>
