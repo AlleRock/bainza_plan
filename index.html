@@ -7,8 +7,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1C1E22">
-<!-- Istruzione per l'icona sui dispositivi Apple (iPhone / iPad) -->
-<link rel="apple-touch-icon" href="icona.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -31,16 +29,20 @@ body{
   color:var(--chalk);
   font-family:'Inter',system-ui,sans-serif;
   min-height:100vh;
+  padding-top:calc(env(safe-area-inset-top) + 72px);
   padding-bottom:90px;
 }
 h1,h2,h3,.num{font-family:'Oswald',sans-serif;}
 
 /* ---- Header ---- */
 header.top{
-  position:sticky; top:0; z-index:20;
-  background:linear-gradient(180deg,var(--asphalt) 80%, transparent);
-  padding:18px 18px 10px;
+  position:fixed; top:0; left:0; right:0; z-index:20;
+  background:var(--asphalt);
+  padding:calc(env(safe-area-inset-top) + 14px) 18px 0;
+}
+header.top .inner{
   display:flex; align-items:baseline; justify-content:space-between;
+  padding-bottom:10px;
 }
 header.top .brand{
   font-family:'Oswald',sans-serif; font-weight:700; font-size:22px;
@@ -52,9 +54,9 @@ header.top .gear{
   padding:6px;
 }
 
-/* ---- Road divider ---- */
+/* ---- Road divider (parte dell'header fisso) ---- */
 .road{
-  height:6px; margin:0 18px 18px; border-radius:3px; position:relative; overflow:hidden;
+  height:6px; margin:0; border-radius:0; position:relative; overflow:hidden;
   background:repeating-linear-gradient(90deg, var(--giallo) 0 18px, transparent 18px 34px);
   opacity:0.55;
 }
@@ -216,10 +218,12 @@ input[type=file]{display:none;}
 <body>
 
 <header class="top">
-  <div class="brand">Bainza<span>Plan</span></div>
-  <button class="gear" onclick="openSheet()">⚙</button>
+  <div class="inner">
+    <div class="brand">Bainza<span>Plan</span></div>
+    <button class="gear" onclick="openSheet()">⚙</button>
+  </div>
+  <div class="road"></div>
 </header>
-<div class="road"></div>
 
 <div id="app"></div>
 
@@ -231,18 +235,8 @@ input[type=file]{display:none;}
 <div class="overlay" id="overlay">
   <div class="sheet">
     <button class="close-x" onclick="closeSheet()">✕</button>
-    
-    <!-- Nuova sezione Sincronizzazione Cloudflare -->
-    <h3>Sincronizzazione Cloud</h3>
-    <p class="hint">Inserisci una chiave segreta univoca per sincronizzare i tuoi dati tra più dispositivi (es. telefono e PC).</p>
-    <div style="display:flex; gap:10px; margin-bottom:16px;">
-      <input type="text" id="syncKeyInput" placeholder="Es. la-mia-chiave-segreta-123" style="flex:1; background:var(--asphalt); color:var(--chalk); border:1px solid var(--line); border-radius:10px; padding:12px; font-size:13px;">
-      <button class="btn" style="margin:0; padding:0 16px; font-size:13px;" onclick="saveSyncKey()">Salva Chiave</button>
-    </div>
-    <div id="syncMessage" style="font-size:12.5px; margin-top:-10px; margin-bottom:16px; display:none;"></div>
-
-    <h3 style="border-top:1px solid var(--line); padding-top:16px; margin-top:16px;">Carica piano locale</h3>
-    <p class="hint">Incolla qui il testo esportato dal tuo template Word, oppure carica il file .txt. Salvato anche nel cloud se la chiave sopra è attiva.</p>
+    <h3>Carica piano</h3>
+    <p class="hint">Incolla qui il testo esportato dal tuo template Word, oppure carica il file .txt. Salvato solo su questo dispositivo, nessun server coinvolto.</p>
     <textarea id="planInput" placeholder="Incolla qui il piano..."></textarea>
     <div class="err" id="parseErr"></div>
     <div class="actions">
@@ -267,9 +261,6 @@ LUN 29/06 | 25-30 km | facile
 
 <script>
 const STORE_KEY = 'bainzaplan_v1';
-const WORKER_URL = 'https://bainzaplan-api.m8online.workers.dev';
-const SYNC_KEY_STORE = 'bainzaplan_sync_key';
-
 let plan = null;
 let view = 'week';
 
@@ -531,84 +522,17 @@ function setView(v){
 function openSheet(){
   document.getElementById('overlay').classList.add('show');
   document.getElementById('parseErr').style.display='none';
-  document.getElementById('syncMessage').style.display='none';
   if(plan) document.getElementById('planInput').value = plan.__raw || '';
-  
-  // Mostra la chiave di sincronizzazione se precedentemente salvata
-  const savedKey = localStorage.getItem(SYNC_KEY_STORE);
-  if(savedKey) {
-    document.getElementById('syncKeyInput').value = savedKey;
-  }
 }
-
 function closeSheet(){ document.getElementById('overlay').classList.remove('show'); }
 
-// Funzione per salvare la chiave e scaricare immediatamente il piano se presente sul cloud
-async function saveSyncKey() {
-  const keyInput = document.getElementById('syncKeyInput').value.trim();
-  const msgDiv = document.getElementById('syncMessage');
-  msgDiv.style.display = 'block';
-  msgDiv.style.color = 'var(--chalk-dim)';
-  
-  if(!keyInput) {
-    localStorage.removeItem(SYNC_KEY_STORE);
-    msgDiv.textContent = 'ℹ️ Chiave rimossa. Sincronizzazione cloud disattivata.';
-    return;
-  }
-  
-  localStorage.setItem(SYNC_KEY_STORE, keyInput);
-  msgDiv.textContent = '🔄 Controllo e sincronizzazione dati cloud...';
-  
-  try {
-    const response = await fetch(WORKER_URL, {
-      method: 'GET',
-      headers: { 'X-Sync-Key': keyInput }
-    });
-    const data = await response.json();
-    if(data.plan && data.plan.raw) {
-      const parsed = parsePlan(data.plan.raw);
-      parsed.__raw = data.plan.raw;
-      plan = parsed;
-      localStorage.setItem(STORE_KEY, JSON.stringify({raw: data.plan.raw, savedAt: data.plan.savedAt || Date.now()}));
-      document.getElementById('planInput').value = data.plan.raw;
-      msgDiv.textContent = '✅ Chiave salvata e dati allineati dal cloud!';
-      msgDiv.style.color = 'var(--taper)';
-      setView(view);
-    } else {
-      msgDiv.textContent = '✅ Chiave salvata. Cloud vuoto per questa chiave (pronto ad accogliere il prossimo salvataggio).';
-      msgDiv.style.color = 'var(--scarico)';
-    }
-  } catch(e) {
-    msgDiv.textContent = '⚠️ Errore di rete con Cloudflare. La chiave è comunque registrata localmente.';
-    msgDiv.style.color = 'var(--picco)';
-  }
-}
-
-async function loadFromTextarea(){
+function loadFromTextarea(){
   const text = document.getElementById('planInput').value;
   try{
     const parsed = parsePlan(text);
     parsed.__raw = text;
     plan = parsed;
     localStorage.setItem(STORE_KEY, JSON.stringify({raw:text, savedAt:Date.now()}));
-    
-    // Se c'è una chiave attiva, invia istantaneamente al cloud
-    const savedKey = localStorage.getItem(SYNC_KEY_STORE);
-    if(savedKey) {
-      try {
-        await fetch(WORKER_URL, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'X-Sync-Key': savedKey
-          },
-          body: JSON.stringify({ rawText: text })
-        });
-      } catch(cloudErr) {
-        console.error('Errore sincronizzazione cloud:', cloudErr);
-      }
-    }
-    
     closeSheet();
     setView(view);
   }catch(e){
@@ -629,7 +553,7 @@ document.getElementById('fileInput').addEventListener('change', (e)=>{
 });
 
 /* ---------- Boot ---------- */
-async function boot(){
+function boot(){
   let saved = localStorage.getItem(STORE_KEY);
   if(!saved){
     const legacy = localStorage.getItem('fassaplan_v1');
@@ -643,38 +567,7 @@ async function boot(){
       plan = parsed;
     }catch(e){ plan = null; }
   }
-  
   setView('week');
-  
-  // Controllo in background dal cloud si c'è una chiave segreta salvata
-  const savedKey = localStorage.getItem(SYNC_KEY_STORE);
-  if(savedKey) {
-    try {
-      const response = await fetch(WORKER_URL, {
-        method: 'GET',
-        headers: { 'X-Sync-Key': savedKey }
-      });
-      const data = await response.json();
-      if(data.plan && data.plan.raw) {
-        let localRaw = plan ? plan.__raw : '';
-        // Se il cloud contiene dati diversi, aggiorna al volo l'app
-        if(data.plan.raw !== localRaw) {
-          const parsed = parsePlan(data.plan.raw);
-          parsed.__raw = data.plan.raw;
-          plan = parsed;
-          localStorage.setItem(STORE_KEY, JSON.stringify({raw: data.plan.raw, savedAt: data.plan.savedAt || Date.now()}));
-          if(view === 'week' && document.getElementById('app')) {
-            if(plan) weekIndex = findCurrentWeekIndex(plan);
-            renderWeek();
-          } else if(view === 'timeline') {
-            renderTimeline();
-          }
-        }
-      }
-    } catch(bootCloudErr) {
-      console.error('Impossibile aggiornare dal cloud all\'avvio:', bootCloudErr);
-    }
-  }
 }
 boot();
 </script>
