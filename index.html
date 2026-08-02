@@ -23,14 +23,11 @@
   --line:#3A3D44;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-html,body{margin:0;padding:0;}
+html,body{margin:0;padding:0; height:100%; overflow:hidden;}
 body{
   background:var(--asphalt);
   color:var(--chalk);
   font-family:'Inter',system-ui,sans-serif;
-  min-height:100vh;
-  padding-top:calc(env(safe-area-inset-top) + 72px);
-  padding-bottom:90px;
 }
 h1,h2,h3,.num{font-family:'Oswald',sans-serif;}
 
@@ -61,7 +58,17 @@ header.top .gear{
   opacity:0.55;
 }
 
-/* ---- Empty state ---- */
+/* ---- Scrollable content area ---- */
+#app{
+  position:fixed;
+  top:calc(env(safe-area-inset-top) + 72px);
+  bottom:calc(env(safe-area-inset-bottom) + 56px);
+  left:0; right:0;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  padding-top:12px;
+  padding-bottom:16px;
+}
 .empty{
   margin:60px 24px; text-align:center; color:var(--chalk-dim);
 }
@@ -102,8 +109,10 @@ header.top .gear{
 .hero .week-range{font-family:'Oswald',sans-serif; font-size:19px; font-weight:600; margin-bottom:14px;}
 .daycard{
   display:flex; align-items:center; gap:14px; padding:13px 0; border-top:1px solid var(--line);
+  cursor:pointer;
 }
 .daycard:first-of-type{border-top:none;}
+.daycard:active{background:rgba(255,255,255,0.04);}
 .daycard .dow{
   font-family:'Oswald',sans-serif; font-weight:700; font-size:13px; width:38px; flex-shrink:0;
   color:var(--chalk-dim);
@@ -128,6 +137,16 @@ header.top .gear{
   margin-top:14px; padding-top:12px; border-top:1px solid var(--line);
   font-size:13px; color:var(--chalk-dim); font-style:italic;
 }
+
+#dayDetail h3{font-family:'Oswald',sans-serif; font-size:21px; font-weight:600; margin:0 0 10px;}
+.detail-rows{margin-top:16px;}
+.detail-row{
+  display:flex; align-items:center; justify-content:space-between; padding:11px 0;
+  border-top:1px solid var(--line);
+}
+.detail-row:first-child{border-top:none;}
+.detail-row .dl{color:var(--chalk-dim); font-size:13px;}
+.detail-row .dv{font-family:'Oswald',sans-serif; font-weight:600; font-size:15px;}
 
 /* countdown ribbon */
 .countdown{
@@ -259,6 +278,13 @@ LUN 29/06 | 25-30 km | facile
   </div>
 </div>
 
+<div class="overlay" id="dayOverlay" onclick="if(event.target===this) closeDayModal()">
+  <div class="sheet">
+    <button class="close-x" onclick="closeDayModal()">✕</button>
+    <div id="dayDetail"></div>
+  </div>
+</div>
+
 <script>
 const STORE_KEY = 'bainzaplan_v1';
 let plan = null;
@@ -306,14 +332,15 @@ function parsePlan(text){
       const dow = dowMatch[1].toUpperCase();
       const date = dowMatch[2];
       const fields = dowMatch[3].split('|').map(f=>f.trim()).filter(f=>f.length);
-      let km='', dplus='', tag='';
+      let km='', dplus='', tag='', noteParts=[];
       for(const f of fields){
         if(/km/i.test(f)) km = f;
         else if(/D\+/i.test(f)) dplus = f;
         else if(tagWords.includes(f.toUpperCase())) tag = f.toUpperCase();
         else if(!tag) tag = f; // facile/medio/etc free text
+        else noteParts.push(f); // campi extra oltre il tag -> nota del giorno
       }
-      curWeek.days.push({ dow: dowMap[dow]||dow, date, km, dplus, tag, raw: fields.join(' · ') });
+      curWeek.days.push({ dow: dowMap[dow]||dow, date, km, dplus, tag, note: noteParts.join(' · '), raw: fields.join(' · ') });
       continue;
     }
   }
@@ -388,6 +415,39 @@ function fmtDayLabel(d){
 /* ---------- Render: Week view ---------- */
 let weekIndex = 0;
 
+function dayTagClass(d){
+  return (d.tag||'').toLowerCase()==='facile' ? 'facile'
+    : (d.tag||'').toLowerCase()==='medio' ? 'medio'
+    : (d.tag||'').toUpperCase()==='PICCO' ? 'PICCO'
+    : (d.tag||'').toUpperCase()==='CARICO' ? 'CARICO'
+    : (d.tag||'').toUpperCase()==='SCARICO' ? 'SCARICO'
+    : (d.tag||'').toUpperCase()==='TAPER' ? 'TAPER'
+    : (d.km==='' ? 'riposo' : '');
+}
+
+function openDayModal(wIdx, dIdx){
+  if(!plan) return;
+  const all = flatWeeks(plan);
+  const week = all[wIdx];
+  if(!week) return;
+  const d = week.days[dIdx];
+  if(!d) return;
+  const tagClass = dayTagClass(d);
+  const detail = document.getElementById('dayDetail');
+  detail.innerHTML = `
+    <h3>${d.dow} ${d.date}</h3>
+    ${d.tag ? `<span class="pill ${tagClass}">${d.tag}</span>` : ''}
+    <div class="detail-rows">
+      <div class="detail-row"><span class="dl">Distanza</span><span class="dv">${d.km || 'Riposo'}</span></div>
+      ${d.dplus ? `<div class="detail-row"><span class="dl">Dislivello</span><span class="dv">${d.dplus}</span></div>` : ''}
+      ${d.tag ? `<div class="detail-row"><span class="dl">Tipo</span><span class="dv">${d.tag}</span></div>` : ''}
+    </div>
+    ${d.note ? `<div class="note-strip" style="margin-top:16px;">💡 ${d.note}</div>` : ''}
+  `;
+  document.getElementById('dayOverlay').classList.add('show');
+}
+function closeDayModal(){ document.getElementById('dayOverlay').classList.remove('show'); }
+
 function renderWeek(){
   const root = document.getElementById('app');
   if(!plan){ root.innerHTML = emptyState(); return; }
@@ -401,17 +461,11 @@ function renderWeek(){
   const today = new Date(); today.setHours(0,0,0,0);
   const y = week.year;
 
-  let daysHtml = week.days.map(d=>{
+  let daysHtml = week.days.map((d,dIdx)=>{
     const dDate = parseItDate(d.date, y);
     const isToday = dDate.getTime()===today.getTime();
-    const tagClass = (d.tag||'').toLowerCase()==='facile' ? 'facile'
-      : (d.tag||'').toLowerCase()==='medio' ? 'medio'
-      : (d.tag||'').toUpperCase()==='PICCO' ? 'PICCO'
-      : (d.tag||'').toUpperCase()==='CARICO' ? 'CARICO'
-      : (d.tag||'').toUpperCase()==='SCARICO' ? 'SCARICO'
-      : (d.tag||'').toUpperCase()==='TAPER' ? 'TAPER'
-      : (d.km==='' ? 'riposo' : '');
-    return `<div class="daycard ${isToday?'today':''}">
+    const tagClass = dayTagClass(d);
+    return `<div class="daycard ${isToday?'today':''}" onclick="openDayModal(${weekIndex},${dIdx})">
       <div class="dow">${d.dow}<br><span style="font-weight:400;opacity:.6;font-size:11px;">${d.date}</span></div>
       <div class="info">
         <div class="km">${d.km || 'Riposo'}</div>
