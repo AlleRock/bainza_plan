@@ -267,13 +267,16 @@ input[type=file]{display:none;}
     </div>
     <div class="example">BLOCCO: Verso 11 Luglio | 2026
 SETTIMANA: 22/06 - 28/06 | CARICO
-LUN 22/06 | 25-30 km | facile
+LUN 22/06 | 25-30 km | 0 D+ | facile
+NOTE: Uscita facile di continuità, senza forzare.
 MER 24/06 | 30-35 km | 400-600 D+ | medio
+NOTE: Ritmo controllato, evitando la soglia.
 SAB 27/06 | 100-110 km | 1800-1900 D+ | PICCO
-NOTE: Settimana chiave di costruzione vera
+NOTE: Uscita principale della settimana, simulazione gara.
+NOTE SETTIMANA: Settimana chiave di costruzione vera.
 
 SETTIMANA: 29/06 - 05/07 | SCARICO
-LUN 29/06 | 25-30 km | facile
+LUN 29/06 | 25-30 km | 0 D+ | facile
 ...</div>
   </div>
 </div>
@@ -294,7 +297,7 @@ let view = 'week';
 function parsePlan(text){
   const lines = text.split('\n').map(l=>l.trim()).filter(l=>l.length);
   const blocchi = [];
-  let curBlocco = null, curWeek = null;
+  let curBlocco = null, curWeek = null, curDay = null;
   const dowMap = {LUN:'Lun',MAR:'Mar',MER:'Mer',GIO:'Gio',VEN:'Ven',SAB:'Sab',DOM:'Dom'};
   const tagWords = ['PICCO','CARICO','SCARICO','TAPER'];
 
@@ -306,7 +309,7 @@ function parsePlan(text){
       const yearPart = parts[1] && /^\d{4}$/.test(parts[1]) ? parseInt(parts[1],10) : null;
       curBlocco = { title, year: yearPart || currentYear(), weeks: [] };
       blocchi.push(curBlocco);
-      curWeek = null;
+      curWeek = null; curDay = null;
       continue;
     }
     if(/^SETTIMANA\s*:/i.test(line)){
@@ -321,10 +324,24 @@ function parsePlan(text){
         days:[], note:'', weekTag: detectWeekTag(label)
       };
       curBlocco.weeks.push(curWeek);
+      curDay = null;
+      continue;
+    }
+    if(/^NOTE\s*SETTIMANA\s*:/i.test(line)){
+      if(curWeek){
+        const t = line.replace(/^NOTE\s*SETTIMANA\s*:/i,'').trim();
+        curWeek.note = curWeek.note ? (curWeek.note + ' · ' + t) : t;
+      }
       continue;
     }
     if(/^NOTE\s*:/i.test(line)){
-      if(curWeek) curWeek.note = line.split(':').slice(1).join(':').trim();
+      const t = line.replace(/^NOTE\s*:/i,'').trim();
+      if(curDay){
+        curDay.note = curDay.note ? (curDay.note + ' · ' + t) : t;
+      } else if(curWeek){
+        // nota senza un giorno a cui agganciarsi: fallback su nota di settimana
+        curWeek.note = curWeek.note ? (curWeek.note + ' · ' + t) : t;
+      }
       continue;
     }
     const dowMatch = line.match(/^([A-Z]{3})\s+(\d{1,2}\/\d{1,2})\s*\|(.*)$/i);
@@ -340,7 +357,9 @@ function parsePlan(text){
         else if(!tag) tag = f; // facile/medio/etc free text
         else noteParts.push(f); // campi extra oltre il tag -> nota del giorno
       }
-      curWeek.days.push({ dow: dowMap[dow]||dow, date, km, dplus, tag, note: noteParts.join(' · '), raw: fields.join(' · ') });
+      const dayObj = { dow: dowMap[dow]||dow, date, km, dplus, tag, note: noteParts.join(' · '), raw: fields.join(' · ') };
+      curWeek.days.push(dayObj);
+      curDay = dayObj;
       continue;
     }
   }
