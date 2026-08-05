@@ -249,6 +249,15 @@ input[type=file]{display:none;}
 .gh-status{font-size:12.5px; margin-top:8px; color:var(--chalk-dim); min-height:16px;}
 .gh-status.ok{color:#6FBF73;}
 .gh-status.err{color:var(--picco);}
+
+/* ---- Strava sync ---- */
+.strava-syncbar{
+  display:flex; align-items:center; gap:10px; padding:0 18px 16px; flex-wrap:wrap;
+}
+.strava-syncbar .btn{margin-top:0; padding:9px 16px; font-size:13px;}
+.strava-sync-status{font-size:12px; color:var(--chalk-dim);}
+.wd.done{border-color:#6FBF73; color:#8FCBA8;}
+.wd.done b{color:#8FCBA8;}
 </style>
 </head>
 <body>
@@ -307,6 +316,18 @@ LUN 29/06 | 25-30 km | 0 D+ | facile
         <button class="btn secondary" onclick="pullFromGithub()">Scarica da GitHub</button>
       </div>
       <div class="gh-status" id="ghStatus"></div>
+    </details>
+
+    <details class="gh-sync" id="stravaSyncBlock">
+      <summary>🚴 Sincronizzazione Strava</summary>
+      <p class="hint" style="margin-top:8px;">Collega Strava per vedere una spunta ✅ sulle attività della timeline già completate. Il confronto usa il valore minimo dei range (es. "25-30 km" → soglia 25) e somma solo attività bici dello stesso giorno. Nessun push automatico: la sincronizzazione parte all'apertura dell'app o col pulsante in Timeline.</p>
+      <input type="text" id="stravaClientId" placeholder="Client ID Strava">
+      <input type="password" id="stravaClientSecret" placeholder="Client Secret Strava">
+      <div class="actions">
+        <button class="btn secondary" onclick="saveStravaConfig()">Salva config</button>
+        <button class="btn secondary" onclick="connectStrava()">Connetti a Strava</button>
+      </div>
+      <div class="gh-status" id="stravaStatus"></div>
     </details>
   </div>
 </div>
@@ -580,13 +601,20 @@ function attachSwipe(){
 function renderTimeline(){
   const root = document.getElementById('app');
   if(!plan){ root.innerHTML = emptyState(); return; }
+  const stravaCfg = loadStravaConfig();
   let html = '';
+  if(stravaCfg.access_token){
+    html += `<div class="strava-syncbar"><button class="btn secondary" onclick="syncStrava()">🔄 Sync Strava</button><span class="strava-sync-status" id="stravaSyncBarStatus">${stravaCfg.last_sync ? ('ultimo sync ' + new Date(stravaCfg.last_sync).toLocaleString('it-IT')) : 'non ancora sincronizzato'}</span></div>`;
+  } else {
+    html += `<div class="strava-syncbar"><span class="strava-sync-status">Connetti Strava dalle Impostazioni ⚙ per vedere le spunte ✅ sulle attività completate.</span></div>`;
+  }
   plan.blocchi.forEach(b=>{
     html += `<div class="blocco-head">${b.title}</div><div class="timeline">`;
     b.weeks.forEach(w=>{
       const dchips = w.days.map(d=>{
         const isPicco = (d.tag||'').toUpperCase()==='PICCO';
-        return `<span class="wd ${isPicco?'PICCO':''}"><b>${d.dow}</b> ${d.km||'riposo'}</span>`;
+        const done = isDayDone(d.dow, d.date, w.year);
+        return `<span class="wd ${isPicco?'PICCO':''} ${done?'done':''}">${done?'✅ ':''}<b>${d.dow}</b> ${d.km||'riposo'}</span>`;
       }).join('');
       html += `<div class="week-row">
         <div class="bar ${w.weekTag}"></div>
@@ -761,8 +789,175 @@ document.getElementById('fileInput').addEventListener('change', (e)=>{
   reader.readAsText(file);
 });
 
+/* ---------- Strava sync ---------- */
+const STRAVA_KEY = 'bainzaplan_strava_config';
+const STRAVA_DONE_KEY = 'bainzaplan_strava_completed';
+const RIDE_TYPES = ['Ride','VirtualRide','GravelRide','MountainBikeRide','EBikeRide','Handcycle'];
+
+function loadStravaConfig(){
+  try{ return JSON.parse(localStorage.getItem(STRAVA_KEY) || '{}'); }catch(e){ return {}; }
+}
+function saveStravaConfigObj(cfg){ localStorage.setItem(STRAVA_KEY, JSON.stringify(cfg)); }
+function saveStravaConfig(){
+  const cfg = loadStravaConfig();
+  cfg.client_id = document.getElementById('stravaClientId').value.trim();
+  cfg.client_secret = document.getElementById('stravaClientSecret').value.trim();
+  saveStravaConfigObj(cfg);
+  setStravaStatus('Configurazione salvata.', 'ok');
+}
+function fillStravaConfigInputs(){
+  const cfg = loadStravaConfig();
+  if(cfg.client_id) document.getElementById('stravaClientId').value = cfg.client_id;
+  if(cfg.client_secret) document.getElementById('stravaClientSecret').value = cfg.client_secret;
+  if(cfg.athlete_name) setStravaStatus('Connesso come ' + cfg.athlete_name + (cfg.last_sync ? (' · ultimo sync ' + new Date(cfg.last_sync).toLocaleString('it-IT')) : ''), 'ok');
+}
+function setStravaStatus(msg, kind){
+  const el = document.getElementById('stravaStatus');
+  if(el){ el.textContent = msg; el.className = 'gh-status' + (kind ? ' '+kind : ''); }
+  const bar = document.getElementById('stravaSyncBarStatus');
+  if(bar) bar.textContent = msg;
+}
+
+function connectStrava(){
+  const cfg = loadStravaConfig();
+  if(!cfg.client_id){ setStravaStatus('Salva prima il Client ID.', 'err'); return; }
+  const redirectUri = window.location.origin + window.location.pathname;
+  const url = `https://www.strava.com/oauth/authorize?client_id=${encodeURIComponent(cfg.client_id)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&approval_prompt=force&scope=activity:read_all`;
+  window.location.href = url;
+}
+
+async function handleStravaCallback(){
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  if(!code) return;
+  // pulisce l'URL subito, cosi' un refresh non rimanda il codice usato
+  const cleanUrl = window.location.origin + window.location.pathname;
+  window.history.replaceState({}, document.title, cleanUrl);
+  const cfg = loadStravaConfig();
+  if(!cfg.client_id || !cfg.client_secret){
+    setStravaStatus('Codice ricevuto ma manca client id/secret salvati.', 'err');
+    return;
+  }
+  setStravaStatus('Connessione a Strava...', '');
+  try{
+    const res = await fetch('https://www.strava.com/oauth/token', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ client_id: cfg.client_id, client_secret: cfg.client_secret, code, grant_type:'authorization_code' })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.message || 'Errore autenticazione Strava');
+    cfg.access_token = data.access_token;
+    cfg.refresh_token = data.refresh_token;
+    cfg.expires_at = data.expires_at;
+    cfg.athlete_name = data.athlete ? [data.athlete.firstname, data.athlete.lastname].filter(Boolean).join(' ') : 'atleta';
+    saveStravaConfigObj(cfg);
+    setStravaStatus('Connesso come ' + cfg.athlete_name + ' ✓', 'ok');
+    await syncStrava(true);
+  }catch(e){
+    setStravaStatus('Errore: ' + e.message, 'err');
+  }
+}
+
+async function ensureStravaToken(){
+  const cfg = loadStravaConfig();
+  if(!cfg.access_token || !cfg.refresh_token) return null;
+  if(cfg.expires_at && cfg.expires_at > (Date.now()/1000 + 60)) return cfg;
+  const res = await fetch('https://www.strava.com/oauth/token', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ client_id: cfg.client_id, client_secret: cfg.client_secret, refresh_token: cfg.refresh_token, grant_type:'refresh_token' })
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.message || 'Token Strava scaduto, riconnetti da Impostazioni.');
+  cfg.access_token = data.access_token;
+  cfg.refresh_token = data.refresh_token;
+  cfg.expires_at = data.expires_at;
+  saveStravaConfigObj(cfg);
+  return cfg;
+}
+
+function parseThreshold(str){
+  if(!str) return null;
+  const nums = (str.match(/\d+([.,]\d+)?/g) || []).map(n=>parseFloat(n.replace(',','.')));
+  if(!nums.length) return null;
+  return Math.min(...nums);
+}
+function toDDMMYYYY(isoLocal){
+  const [y,m,d] = isoLocal.slice(0,10).split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function buildPlanDayIndex(){
+  const idx = [];
+  if(!plan) return idx;
+  plan.blocchi.forEach(b=>b.weeks.forEach(w=>{
+    w.days.forEach(d=>{
+      const kmT = parseThreshold(d.km);
+      if(kmT===null) return; // giorno di riposo, niente da confrontare
+      idx.push({ key: `${d.date}/${w.year}`, kmThreshold: kmT, dplusThreshold: parseThreshold(d.dplus) });
+    });
+  }));
+  return idx;
+}
+
+function loadCompletedMap(){
+  try{ return JSON.parse(localStorage.getItem(STRAVA_DONE_KEY) || '{}'); }catch(e){ return {}; }
+}
+function saveCompletedMap(map){ localStorage.setItem(STRAVA_DONE_KEY, JSON.stringify(map)); }
+function isDayDone(dow, date, year){ return !!loadCompletedMap()[`${date}/${year}`]; }
+
+async function syncStrava(silent){
+  const dayIndex = buildPlanDayIndex();
+  if(!dayIndex.length){ if(!silent) setStravaStatus('Nessun piano caricato da confrontare.', 'err'); return; }
+  let cfg;
+  try{ cfg = await ensureStravaToken(); }catch(e){ setStravaStatus(e.message, 'err'); return; }
+  if(!cfg){ if(!silent) setStravaStatus('Connetti prima Strava dalle Impostazioni.', 'err'); return; }
+
+  setStravaStatus('Sincronizzo con Strava...', '');
+  try{
+    const parseKey = k=>{ const [d,m,y]=k.split('/').map(Number); return new Date(y,m-1,d); };
+    const dates = dayIndex.map(d=>parseKey(d.key));
+    const after = Math.floor(Math.min(...dates)/1000) - 86400;
+    const before = Math.floor((Math.max(...dates) + 2*86400*1000)/1000);
+
+    let activities = [];
+    let page = 1;
+    while(page<=4){
+      const res = await fetch(`https://www.strava.com/api/v3/athlete/activities?after=${after}&before=${before}&per_page=200&page=${page}`,
+        { headers: { 'Authorization': 'Bearer ' + cfg.access_token } });
+      if(!res.ok){ const errData = await res.json().catch(()=>({})); throw new Error(errData.message || ('Errore API Strava (' + res.status + ')')); }
+      const batch = await res.json();
+      activities = activities.concat(batch);
+      if(batch.length < 200) break;
+      page++;
+    }
+
+    const sums = {};
+    activities.filter(a=>RIDE_TYPES.includes(a.type) || RIDE_TYPES.includes(a.sport_type)).forEach(a=>{
+      const key = toDDMMYYYY(a.start_date_local);
+      if(!sums[key]) sums[key] = { km:0, dplus:0 };
+      sums[key].km += (a.distance || 0) / 1000;
+      sums[key].dplus += (a.total_elevation_gain || 0);
+    });
+
+    const map = loadCompletedMap();
+    dayIndex.forEach(d=>{
+      const s = sums[d.key];
+      const done = !!s && s.km >= d.kmThreshold && (d.dplusThreshold===null || s.dplus >= d.dplusThreshold);
+      map[d.key] = done;
+    });
+    saveCompletedMap(map);
+
+    cfg.last_sync = Date.now();
+    saveStravaConfigObj(cfg);
+    setStravaStatus('Sincronizzato con Strava ✓ · ' + new Date().toLocaleTimeString('it-IT'), 'ok');
+    if(view==='timeline') renderTimeline();
+  }catch(e){
+    setStravaStatus('Errore sync: ' + e.message, 'err');
+  }
+}
+
 /* ---------- Boot ---------- */
-function boot(){
+async function boot(){
   let saved = localStorage.getItem(STORE_KEY);
   if(!saved){
     const legacy = localStorage.getItem('fassaplan_v1');
@@ -778,8 +973,12 @@ function boot(){
   }
   setView('week');
   fillGhConfigInputs();
+  fillStravaConfigInputs();
   const ghCfg = loadGhConfig();
-  if(ghCfg.repo && ghCfg.path) pullFromGithub(true);
+  if(ghCfg.repo && ghCfg.path) await pullFromGithub(true);
+  await handleStravaCallback();
+  const stravaCfg = loadStravaConfig();
+  if(stravaCfg.access_token && plan) syncStrava(true);
 }
 boot();
 
