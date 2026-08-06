@@ -611,6 +611,15 @@ function attachSwipe(){
   }, {passive:true});
 }
 
+function goToWeekFromTimeline(idx){
+  weekIndex = idx;
+  view = 'week';
+  document.getElementById('nav-week').classList.add('active');
+  document.getElementById('nav-timeline').classList.remove('active');
+  renderWeek();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
 /* ---------- Render: Timeline ---------- */
 function renderTimeline(){
   const root = document.getElementById('app');
@@ -622,6 +631,7 @@ function renderTimeline(){
   } else {
     html += `<div class="strava-syncbar"><span class="strava-sync-status">Connetti Strava dalle Impostazioni ⚙ per vedere le spunte ✅ sulle attività completate.</span></div>`;
   }
+  let globalWeekIdx = 0;
   plan.blocchi.forEach(b=>{
     html += `<div class="blocco-head">${b.title}</div><div class="timeline">`;
     b.weeks.forEach(w=>{
@@ -632,7 +642,7 @@ function renderTimeline(){
         const icon = st && st.status==='done' ? '✅ ' : (st && st.status==='partial' ? '🟡 ' : '');
         return `<span class="wd ${isPicco?'PICCO':''} ${cls}">${icon}<b>${d.dow}</b> ${d.km||'riposo'}</span>`;
       }).join('');
-      html += `<div class="week-row">
+      html += `<div class="week-row" onclick="goToWeekFromTimeline(${globalWeekIdx})" style="cursor:pointer;">
         <div class="bar ${w.weekTag}"></div>
         <div class="content">
           <div class="wtitle">${w.label||''}</div>
@@ -641,6 +651,7 @@ function renderTimeline(){
           ${w.note ? `<div class="note-strip" style="margin-top:8px;">💡 ${w.note}</div>` : ''}
         </div>
       </div>`;
+      globalWeekIdx++;
     });
     html += `</div>`;
   });
