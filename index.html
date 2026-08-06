@@ -136,6 +136,13 @@ header.top .gear{
 .pill.SCARICO{background:#3A3320; color:var(--scarico);}
 .pill.TAPER{background:#243A30; color:var(--taper);}
 .pill.riposo{background:#2A2C31; color:var(--chalk-dim);}
+.status-dot{
+  width:9px; height:9px; border-radius:50%; flex-shrink:0; margin-right:2px;
+}
+.status-dot.done{background:#6FBF73; box-shadow:0 0 0 2px rgba(111,191,115,.18);}
+.status-dot.partial{background:#E8C36A; box-shadow:0 0 0 2px rgba(232,195,106,.18);}
+.detail-row.strava-actual .dv{color:#8FCBA8;}
+.detail-row.strava-actual.partial .dv{color:#E8C36A;}
 
 .note-strip{
   margin-top:14px; padding-top:12px; border-top:1px solid var(--line);
@@ -258,6 +265,8 @@ input[type=file]{display:none;}
 .strava-sync-status{font-size:12px; color:var(--chalk-dim);}
 .wd.done{border-color:#6FBF73; color:#8FCBA8;}
 .wd.done b{color:#8FCBA8;}
+.wd.partial{border-color:#E8C36A; color:#E8C36A;}
+.wd.partial b{color:#E8C36A;}
 </style>
 </head>
 <body>
@@ -503,6 +512,7 @@ function openDayModal(wIdx, dIdx){
   const d = week.days[dIdx];
   if(!d) return;
   const tagClass = dayTagClass(d);
+  const st = getDayStatus(d.date, week.year);
   const detail = document.getElementById('dayDetail');
   detail.innerHTML = `
     <h3>${d.dow} ${d.date}</h3>
@@ -511,6 +521,7 @@ function openDayModal(wIdx, dIdx){
       <div class="detail-row"><span class="dl">Distanza</span><span class="dv">${d.km || 'Riposo'}</span></div>
       ${d.dplus ? `<div class="detail-row"><span class="dl">Dislivello</span><span class="dv">${d.dplus}</span></div>` : ''}
       ${d.tag ? `<div class="detail-row"><span class="dl">Tipo</span><span class="dv">${d.tag}</span></div>` : ''}
+      ${st ? `<div class="detail-row strava-actual ${st.status}"><span class="dl">Fatto (Strava)</span><span class="dv">${st.status==='done'?'✅ ':(st.status==='partial'?'🟡 ':'')}${st.km.toFixed(1)} km${st.dplusThreshold!==null ? ' · ' + Math.round(st.dplus) + ' D+' : ''}</span></div>` : ''}
     </div>
     ${d.note ? `<div class="note-strip" style="margin-top:16px;">💡 ${d.note}</div>` : ''}
   `;
@@ -535,12 +546,15 @@ function renderWeek(){
     const dDate = parseItDate(d.date, y);
     const isToday = dDate.getTime()===today.getTime();
     const tagClass = dayTagClass(d);
+    const st = getDayStatus(d.date, y);
+    const dot = st ? `<span class="status-dot ${st.status}" title="${st.status==='done'?'Completato':'Parziale'}"></span>` : '';
     return `<div class="daycard ${isToday?'today':''}" onclick="openDayModal(${weekIndex},${dIdx})">
       <div class="dow">${d.dow}<br><span style="font-weight:400;opacity:.6;font-size:11px;">${d.date}</span></div>
       <div class="info">
         <div class="km">${d.km || 'Riposo'}</div>
         <div class="meta">${d.dplus || ''}</div>
       </div>
+      ${dot}
       ${d.tag ? `<span class="pill ${tagClass}">${d.tag}</span>` : ''}
     </div>`;
   }).join('');
@@ -613,8 +627,10 @@ function renderTimeline(){
     b.weeks.forEach(w=>{
       const dchips = w.days.map(d=>{
         const isPicco = (d.tag||'').toUpperCase()==='PICCO';
-        const done = isDayDone(d.dow, d.date, w.year);
-        return `<span class="wd ${isPicco?'PICCO':''} ${done?'done':''}">${done?'✅ ':''}<b>${d.dow}</b> ${d.km||'riposo'}</span>`;
+        const st = getDayStatus(d.date, w.year);
+        const cls = st ? st.status : '';
+        const icon = st && st.status==='done' ? '✅ ' : (st && st.status==='partial' ? '🟡 ' : '');
+        return `<span class="wd ${isPicco?'PICCO':''} ${cls}">${icon}<b>${d.dow}</b> ${d.km||'riposo'}</span>`;
       }).join('');
       html += `<div class="week-row">
         <div class="bar ${w.weekTag}"></div>
@@ -903,7 +919,8 @@ function loadCompletedMap(){
   try{ return JSON.parse(localStorage.getItem(STRAVA_DONE_KEY) || '{}'); }catch(e){ return {}; }
 }
 function saveCompletedMap(map){ localStorage.setItem(STRAVA_DONE_KEY, JSON.stringify(map)); }
-function isDayDone(dow, date, year){ return !!loadCompletedMap()[`${date}/${year}`]; }
+// Ritorna null se non sincronizzato/nessun dato, altrimenti {status, km, dplus, kmThreshold, dplusThreshold}
+function getDayStatus(date, year){ return loadCompletedMap()[`${date}/${year}`] || null; }
 
 async function syncStrava(silent){
   const dayIndex = buildPlanDayIndex();
@@ -942,8 +959,15 @@ async function syncStrava(silent){
     const map = loadCompletedMap();
     dayIndex.forEach(d=>{
       const s = sums[d.key];
-      const done = !!s && s.km >= d.kmThreshold && (d.dplusThreshold===null || s.dplus >= d.dplusThreshold);
-      map[d.key] = done;
+      const km = s ? s.km : 0;
+      const dplus = s ? s.dplus : 0;
+      const kmOk = km >= d.kmThreshold;
+      const dplusOk = d.dplusThreshold===null || dplus >= d.dplusThreshold;
+      let status = 'none';
+      if(kmOk && dplusOk) status = 'done';
+      else if(km > 0 || dplus > 0) status = 'partial'; // fatto qualcosa ma non abbastanza per entrambe le soglie
+      if(status==='none' && !s){ delete map[d.key]; return; } // nessuna attivita' quel giorno: niente da mostrare
+      map[d.key] = { status, km, dplus, kmThreshold: d.kmThreshold, dplusThreshold: d.dplusThreshold };
     });
     saveCompletedMap(map);
 
@@ -951,6 +975,7 @@ async function syncStrava(silent){
     saveStravaConfigObj(cfg);
     setStravaStatus('Sincronizzato con Strava ✓ · ' + new Date().toLocaleTimeString('it-IT'), 'ok');
     if(view==='timeline') renderTimeline();
+    if(view==='week') renderWeek();
   }catch(e){
     setStravaStatus('Errore sync: ' + e.message, 'err');
   }
