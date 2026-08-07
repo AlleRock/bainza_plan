@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bainzaplan-v6';
+const CACHE_NAME = 'bainzaplan-v7';
 const ASSETS = [
   './',
   './index.html',
