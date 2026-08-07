@@ -111,6 +111,12 @@ header.top .gear{
 .hero.tag-TAPER{border-color:var(--taper);}
 .hero .week-title{font-size:13px; color:var(--chalk-dim); text-transform:uppercase; letter-spacing:1px; margin-bottom:2px;}
 .hero .week-range{font-family:'Oswald',sans-serif; font-size:19px; font-weight:600; margin-bottom:14px;}
+.today-btn{
+  display:block; width:100%; margin-top:16px; padding:12px; border-radius:10px;
+  background:var(--asphalt); border:1.5px solid var(--line); color:var(--chalk);
+  font-size:14px; font-weight:600; cursor:pointer; text-align:center;
+}
+.today-btn:active{background:rgba(255,255,255,0.05);}
 .daycard{
   display:flex; align-items:center; gap:14px; padding:13px 0; border-top:1px solid var(--line);
   cursor:pointer;
@@ -582,6 +588,7 @@ function renderWeek(){
       <div class="week-title">${week.label || ''}</div>
       <div class="week-range">${week.range}</div>
       ${daysHtml}
+      ${!isCurrentReal ? `<button class="today-btn" onclick="goToCurrentWeek()">📍 Torna a oggi</button>` : ''}
       ${week.note ? `<div class="note-strip">💡 ${week.note}</div>` : ''}
     </div>
     ${cdHtml}
@@ -592,6 +599,13 @@ function renderWeek(){
 function goWeek(delta){
   weekIndex += delta;
   renderWeek();
+}
+
+function goToCurrentWeek(){
+  if(!plan) return;
+  weekIndex = findCurrentWeekIndex(plan);
+  renderWeek();
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
 function attachSwipe(){
